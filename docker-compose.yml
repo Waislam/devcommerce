@@ -1,0 +1,83 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: django_web
+    command: >
+      sh -c "
+      python manage.py migrate &&
+      python manage.py collectstatic --noinput &&
+      python manage.py runserver 0.0.0.0:8000
+      "
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - .env
+
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: celery_worker
+    command: celery -A devcommerce worker --pool=solo -l info
+    depends_on:
+      - redis
+      - db
+      - web
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+
+  celery_beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: celery_beat
+    command: >
+      celery -A devcommerce beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    depends_on:
+      - redis
+      - db
+      - web
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+
+  flower:
+    image: mher/flower
+    container_name: celery_flower
+    ports:
+      - "5556:5555"
+    depends_on:
+      - redis
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379
+
+  redis:
+    image: redis:alpine
+    container_name: redis_alpine
+    ports:
+      - "6380:6379"
+
+  db:
+    image: postgres:alpine
+    container_name: postgres_db
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: devxhub
+      POSTGRES_USER: dev_user
+      POSTGRES_PASSWORD: dev_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

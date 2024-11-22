@@ -1,0 +1,29 @@
+name: Deploy to Production
+on:
+  push:
+    branches:
+      - master
+jobs:
+  Production-Deploy:
+    permissions:
+      id-token: write
+      contents: read
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Deploy to Server
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.PROD_IP }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_KEY }}
+          port: 22
+          script: |
+            set -e
+            chmod +x /home/script.sh
+            /bin/bash /home/script.sh
+        continue-on-error: ${{ false }}
